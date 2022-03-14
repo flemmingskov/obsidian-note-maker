@@ -7,4 +7,4 @@
 The aim of the project is to create a tool that can be used directly in any web-browser
 
 
-##### Very preliminary test version, March, 6 - 2022
+##### Very preliminary test version, March, 13 - 2022
