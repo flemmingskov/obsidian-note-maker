@@ -22,7 +22,8 @@ wnl = WordNetLemmatizer()
 
 # SETTING VARIABLES
 ###################
-time_stamp = datetime.datetime.now().strftime('(%Y,%b,%d)')  # time stamp
+time_stamp = datetime.datetime.now().strftime('(%Y,%b,%d)')
+current_time = datetime.datetime.now().strftime("%H:%M:%S")
 imported_keywords_chosen = []
 private_keywords_chosen = []
 
@@ -55,6 +56,27 @@ def clean_keyword (old_keyword):
             #    composite_keyword = synonyms.get(composite_keyword)
     if composite_keyword != '':
         return composite_keyword
+
+def adjacent_pairs(seq):
+    pairList = []
+    it = iter(seq)
+    prev = next(it)
+    for item in it:
+        pairList.append(prev + '-' + item)
+        prev = item
+    return pairList
+
+def extract_keywords_from_text (myText, keyword_list):
+    myText = myText.replace("-", " ").replace(".", " ").replace(",", " ").lower()
+    text_tokens = word_tokenize(myText)
+    tokens_without_sw = [word for word in text_tokens if not word in set(stopwords.words('english'))]
+    all_combinations = adjacent_pairs(tokens_without_sw) + tokens_without_sw
+    for keyword_raw in all_combinations:
+        cleaned_keyword = clean_keyword(keyword_raw)
+    all_combinations_clean = [word for word in all_combinations if word in keyword_list]
+    all_combinations_clean = ';'.join([str(elem) for elem in list(set(all_combinations_clean))])
+    return all_combinations_clean 
+
 
 
 # SIDEBAR LAYOUT
@@ -98,6 +120,15 @@ with st.expander("Instructions"):
         * Press '**Export**' to process Obsidian note files as a .zip  
     """)
 
+# EXPANDER for Settings
+with st.expander("Settings and controls ..."):
+    st.write("Extract keywords from:")
+    run_keywords = st.checkbox('Web of Science', value=True, key='runKeywords')
+    run_title = st.checkbox('Title', value=False, key='runTitle')
+    run_abstract = st.checkbox('Abstract', value=False, key='runKAbstract')
+    number_keywords_to_include = st.slider('Number of keywords to include (sorted by occurrences)', 0, 250, 50)
+
+
 # UPLOAD FILES
 ##############
 st.write(' - - -')
@@ -111,12 +142,13 @@ if not uploaded_wos_files:
   st.warning('Please, upload one ore more Web of Science export files')
   st.stop()
 
+
 # initializing data frames
 raw_wos_data_df = pd.DataFrame()
 processed_wos_data_df = pd.DataFrame()
 
 for uploaded_file in uploaded_wos_files:
-    print(' .. step I - importing: ')
+    print(' .. executed ' + str(current_time))
     columnames = []
     for i in range(0, 69):
         columnames.append(str(i))
@@ -148,6 +180,9 @@ for uploaded_file in uploaded_wos_files:
     processed_wos_data_df['year'] = processed_wos_data_df.year.astype(int)
     processed_wos_data_df['cites'] = processed_wos_data_df.cites.astype(int)
 
+with st.expander("Show records imported"):
+    st.dataframe(processed_wos_data_df)
+
 # linking unique categories to WoS IDs        
 wos_list, year_list, cat_list, cite_list, person_list, email_list, funding_list = ([] for i in range(7))
 
@@ -170,8 +205,7 @@ links_to_categories_df = pd.DataFrame({'wosid': wos_list, 'year': year_list,
                     'category': cat_list, 'cites': cite_list})
 links_to_categories_df = links_to_categories_df[1:]
 links_to_categories_df = links_to_categories_df[['wosid', 'year', 'cites', 'category']]
-dep_links_df = links_to_categories_df
-dep_links_df = dep_links_df.drop_duplicates(keep='last')
+links_to_categories_df = links_to_categories_df.drop_duplicates(keep='last')
 
 
 # SHOW KEYWORDS FROM UPLOADED FILES
@@ -180,7 +214,7 @@ st.write(' - - -')
 st.subheader('-> keywords in uploaded files')
 
 search_criteria = """(links_to_categories_df.category != 'dummyCriteria')"""
-selected_records = (dep_links_df.loc[eval(search_criteria), ['wosid']]
+selected_records = (links_to_categories_df.loc[eval(search_criteria), ['wosid']]
                 .drop_duplicates(['wosid']))
 extract_kewords_from_df = (pd.merge(selected_records, processed_wos_data_df, on='wosid', how='inner')[['authors', 'title', 
                 'kw1', 'kw2', 'abstr', 'inst', 'email', 'autID', 'funding', 
@@ -226,11 +260,10 @@ more occurrences: {twos}""")
 
 with st.expander("Show all keywords from uploaded files"):
     st.dataframe(keyword_count)
-#if st.checkbox("Show all keywords from uploaded files"):
     
 imported_keyword_series = keyword_count['keyword'].squeeze()
-imported_keywords_default = imported_keyword_series[0:45]
-imported_keywords_options = imported_keyword_series[0:200]
+imported_keywords_default = imported_keyword_series[0:number_keywords_to_include]
+imported_keywords_options = imported_keyword_series[0:500]
 
 imported_keywords_chosen = st.multiselect(
     'Add or delete keywords from list',
@@ -242,22 +275,25 @@ imported_keywords_chosen = st.multiselect(
 #######################
 st.write(' - - -')
 st.subheader('-> private keywords')
-st.markdown('Add optionally a list of __private keywords__ to the searchoptionally ')
-uploaded_keywords = st.file_uploader("", accept_multiple_files=False)
-if not uploaded_keywords:
-  st.warning('No private keywords uploaded')
-else:
-  private_keywords = pd.read_csv(uploaded_keywords).squeeze()
-  private_keywords_chosen = st.multiselect(
-    'Add or delete keywords from list',
-    private_keywords,
-    private_keywords)
-final_list_of_keywords = list(set(imported_keywords_chosen + private_keywords_chosen))
-final_list_of_keywords.sort()
+st.markdown('Optionally expand the search with a list of __private keywords__')
+
+with st.expander('Show multiselect', expanded=True):
+    uploaded_keywords = st.file_uploader("", accept_multiple_files=False)
+    if not uploaded_keywords:
+        final_list_of_keywords = []
+        st.warning('No private keywords uploaded')
+    else:
+        private_keywords = pd.read_csv(uploaded_keywords).squeeze()
+        private_keywords_chosen = st.multiselect(
+        'Add or delete keywords from list',
+        private_keywords,
+        private_keywords)
+    final_list_of_keywords = list(set(imported_keywords_chosen + private_keywords_chosen))
+    final_list_of_keywords.sort()
 
 
-# SHOW COMBINED KEYWORDS
-########################
+# SHOW LIST OF COMBINED KEYWORDS FOR FINAL EDITING
+##################################################
 st.write(' - - -')
 st.subheader('-> combined keywords')
 st.markdown('Final list of combined WoS and private keywords - sorted alphabetically')
@@ -265,3 +301,72 @@ final_keywords_chosen = st.multiselect(
     'Add or delete keywords from list',
     final_list_of_keywords,
     final_list_of_keywords)
+
+
+# EXTRACTING KEYWORDS FROM TITLE (and perhabs? abstract)
+##################################################
+st.write(' - - -')
+st.subheader('-> extract keywords from title and abstract')
+st.markdown('   ')
+
+keywords_approved = final_keywords_chosen
+
+# set to supress warning of chained assigment - not recommended, but looks nicer in output ;)                
+pd.set_option("mode.chained_assignment", None)
+
+run_script =  st.button('Extract keywords from imported files')
+if run_script:
+    with st.spinner('Processing and extracting keywords ...'):
+        clean_list = []
+        processed_wos_data_df['kw1_clean'] = ''
+        processed_wos_data_df['kw2_clean'] = ''
+        processed_wos_data_df['kw_title'] = ''
+        processed_wos_data_df['kw_abst'] = ''
+
+        for index, row in processed_wos_data_df.iterrows():  # Iterate over all rows in dataframe
+
+            # cleaning regular keywords
+            if run_keywords:
+                current_record = row[14]
+                keyword_list = row[2]
+                concat_clean = ''
+                for kw in keyword_list.split(";"):
+                    cleaned_keyword = clean_keyword(kw)
+                    if concat_clean == '':
+                        concat_clean = cleaned_keyword
+                    else:
+                        concat_clean = concat_clean + ';' + cleaned_keyword
+                processed_wos_data_df.loc[index,['kw1_clean']] = concat_clean  
+
+                ## keywords plus from Web of Science
+                keyword_list = row[3]
+                concat_clean = ''
+                for kw in keyword_list.split(";"):
+                    cleaned_keyword = clean_keyword(kw)
+                    if concat_clean == '':
+                        concat_clean = cleaned_keyword
+                    else:
+                        concat_clean = concat_clean + ';' + cleaned_keyword
+                processed_wos_data_df.loc[index,['kw2_clean']] = concat_clean
+
+            # extracting keywords from title
+            if run_title:
+                title_text = row[1]
+                keywords_in_title = extract_keywords_from_text(title_text, keywords_approved) 
+                processed_wos_data_df.loc[index,['kw_title']] = keywords_in_title
+
+            # extracting keywords from abstract
+            if run_abstract:
+                abstract_text = row[4]
+                if abstract_text != '':
+                    keywords_in_abstract = extract_keywords_from_text(abstract_text, keywords_approved)
+                    processed_wos_data_df.loc[index,['kw_abst']] = keywords_in_abstract
+                else:
+                    processed_wos_data_df.loc[index,['kw_abst']] = ''
+
+    # dataOut = processed_wos_data_df[['wosid', 'title', 'kw1_clean', 'kw2_clean', 'kw_title', 'kw_abst', 'year']]
+    # dataOut[["year"]] = dataOut[["year"]].apply(pd.to_numeric)
+    # dataOut = dataOut[dataOut['year'].notna()]
+
+    with st.expander("Show records processed"):
+        st.dataframe(processed_wos_data_df)
