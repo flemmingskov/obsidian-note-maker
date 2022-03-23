@@ -14,6 +14,7 @@ import numpy as np
 import datetime
 import platform
 import itertools
+import zipfile
 import re
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
@@ -372,9 +373,10 @@ if update_df:
     run_script =  st.button('Export to Obsidian')
 
     if run_script:
+        zf = zipfile.ZipFile("sampleS.zip", "a", compression=zipfile.ZIP_DEFLATED)
         keyword_list = final_list_of_keywords
-        for col in wos_data_for_obsidian.columns:
-            print(col)
+        # for col in wos_data_for_obsidian.columns:
+        #     print(col)
 
         papers_in = wos_data_for_obsidian[['wosid', 'authors', 'title', 'abstr', 'year', 'journal', 'cites', 'wos_sub_cat1', 'doi', 'usc1', 'usc2', 'kw1_clean', 'kw2_clean', 'kw_title', 'kw_abst']].fillna('')
         papers_in['title'] = papers_in.title.astype(str)
@@ -383,20 +385,22 @@ if update_df:
         papers_in['usc2'] = papers_in.usc2.astype(int)
 
         # CREATE OBSIDIAN NOTES FOR KEYWORDS
-        MDspace = get_platform() + 'testtest/'
-        for keyword_item in keyword_list:
-            keyword_item = keyword_item.replace("/", "-")
-            md_file = open(MDspace + '% ' + str(keyword_item)+'.md',"w")
+        # MDspace = get_platform() + 'testtest/'
+        # for keyword_item in keyword_list:
+        #     keyword_item = keyword_item.replace("/", "-")
+        #     md_file = open(MDspace + '% ' + str(keyword_item)+'.md',"w")
 
-            md_file.write('#### ' + keyword_item + empty_line + '- - -' + empty_line)
-            md_file.write('#keyword' + empty_line + '- - -' + empty_line)       
-            md_file.write('\n\n' + '##### Notes: ' + empty_line)
-            md_file.close()
+        #     str_content_md += ('#### ' + keyword_item + empty_line + '- - -' + empty_line)
+        #     str_content_md += ('#keyword' + empty_line + '- - -' + empty_line)       
+        #     str_content_md += ('\n\n' + '##### Notes: ' + empty_line)
+        #     md_file.close()
             
         # CREATE OBSIDIAN NOTES FOR PAPERS WITH LINKS TO KEYWORDS AND SUBJECTS
         category_list = []
 
         for index, row in papers_in.iterrows():
+            str_content_md = ''
+
             all_keywords_in_paper_list = []
             all_keywords_in_paper = ()
             wosid = row[0]
@@ -409,10 +413,12 @@ if update_df:
             short_title = ' '.join(split_title)
             
             abstract = row[3]
+            print(abstract)
             year = str(int(row[4]))
             
             note_title_unclean = title_author + ' ' + year + ' -  ' + short_title
             note_title = re.sub('[^a-zA-Z0-9 \n\.]', '', note_title_unclean)
+            note_title += '.md'
         
             journal = row[5]
             journal = journal.title()
@@ -434,53 +440,63 @@ if update_df:
             all_keywords_in_paper = list(filter(None, all_keywords_in_paper))
             all_keywords_in_paper = sorted(all_keywords_in_paper, key=str.lower)
 
-            md_file = open(MDspace + note_title +'.md',"w")
+            #md_file = open(MDspace + note_title +'.md',"w")
             
-            md_file.write('__' + title_paper + '__' + empty_line)
-            md_file.write('' + journal +  empty_line)
-            md_file.write('_' + authors +  '_' + empty_line)
-            md_file.write('' + 'Data: [year:: ' + year + ']  [cites:: ' + str(cites) + '] [recent:: ' + str(recent) + '] [historic:: ' + str(historic) + ']')
-            md_file.write(empty_line + '- - -' + empty_line)
-            md_file.write('#paper   Web of Science id: ' + wosid + '     ')
-            md_file.write('[Google Scholar ](https://scholar.google.dk/scholar?q=' + doi + ')' + empty_line)
-            md_file.write(empty_line + '- - -' + empty_line)
+            str_content_md += ('__' + title_paper + '__' + empty_line)
+            str_content_md += ('' + journal +  empty_line)
+            str_content_md += ('_' + authors +  '_' + empty_line)
+            str_content_md += ('' + 'Data: [year:: ' + year + ']  [cites:: ' + str(cites) + '] [recent:: ' + str(recent) + '] [historic:: ' + str(historic) + ']')
+            str_content_md += (empty_line + '- - -' + empty_line)
+            str_content_md += ('#paper   Web of Science id: ' + wosid + '     ')
+            str_content_md += ('[Google Scholar ](https://scholar.google.dk/scholar?q=' + doi + ')' + empty_line)
+            str_content_md += (empty_line + '- - -' + empty_line)
 
-            md_file.write(abstract)
-            md_file.write(empty_line)
-            md_file.write('- - -' + '\n')
+            str_content_md += (abstract)
+            str_content_md += (empty_line)
+            str_content_md += ('- - -' + '\n')
 
-            md_file.write('_[rating:: 0] (scale: 0-10)_ \n')
-            md_file.write('- [ ] checked \n' + '- - -' + '\n')
+            str_content_md += ('_[rating:: 0] (scale: 0-10)_ \n')
+            str_content_md += ('- [ ] checked \n' + '- - -' + '\n')
             
-            md_file.write('*WoS categories:*' + ': \n')
+            str_content_md += ('*WoS categories:*' + ': \n')
             paper_categories = wos_categories.split(";")
             for category in paper_categories:
                 categoryLstrp = category.lstrip()
-                md_file.write('[[%% ' + categoryLstrp + ']]' + '  ')
+                str_content_md += ('[[%% ' + categoryLstrp + ']]' + '\n')
                 category_list.append(categoryLstrp)
             
-            md_file.write(empty_line + '*Keyword links:*' + '\n')
+            str_content_md += (empty_line + '*Keyword links:*' + '\n')
             add_keywords = []
             for kw in all_keywords_in_paper:
                 if kw in keyword_list:
-                    md_file.write('[[% ' + kw + ']]' + '\n') # + empty_line)
+                    str_content_md += ('[[% ' + kw + ']]' + '\n') # + empty_line)
                 else:
                     add_keywords.append(kw)
-            md_file.write(empty_line +  'Additional keywords: ' + empty_line)
+            str_content_md += (empty_line +  'Additional keywords: ' + empty_line)
             add_keywords_nicelist = ('\n'.join(add_keywords))
-            md_file.write(str(add_keywords_nicelist))        
-            md_file.close()
-            
+            str_content_md += (str(add_keywords_nicelist))  
+
+            zf.writestr(note_title, str_content_md)      
+            #md_file.close()
+
+
+        #st.write(str_content_md) 
         # CREATE NOTES FOR SUBJECT CATEGORIES
         category_list = list(set(category_list))
         category_list.sort()
 
-        for category_item in category_list:
-            md_file = open(MDspace + '%% ' + str(category_item)+'.md',"w")
+        # for category_item in category_list:
+        #     md_file = open(MDspace + '%% ' + str(category_item)+'.md',"w")
 
-            md_file.write('#### ' + category_item + empty_line + '- - -' + empty_line)
-            md_file.write('#subject' + empty_line + '- - -' + empty_line)       
-            md_file.write('\n\n' + '##### Characteristic keywords (most frequent first): ' + empty_line)
+        #     str_content_md += ('#### ' + category_item + empty_line + '- - -' + empty_line)
+        #     str_content_md += ('#subject' + empty_line + '- - -' + empty_line)       
+        #     str_content_md += ('\n\n' + '##### Characteristic keywords (most frequent first): ' + empty_line)
+
+
+        zf.close()
+
+
+
 
             # selResKey = data_keywords[data_keywords[column_identifier] == category_item]
             # selResKey = selResKey.dropna()
@@ -494,8 +510,8 @@ if update_df:
             #     countKeywords = countKeywords + 1
             #     if (int(row[1]) < 2) or (countKeywords > 25):
             #         break
-            #     md_file.write(str(row[1]) + ' - [[' + str(row[0]) + ']] ' + ' \n')
+            #     str_content_md += (str(row[1]) + ' - [[' + str(row[0]) + ']] ' + ' \n')
 
-            md_file.close()
+            # md_file.close()
 
         print('... obsidian mark-down files created')
