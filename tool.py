@@ -2,7 +2,8 @@
 File: tool.py
 Author: Flemming Skov 
 Start app from a terminal window typing: "streamlit run 'path_to_tool_folder'/tool.py
-Latest version: March 19 2022
+Latest version: March 23 2022
+Goal: experimenting with zipping
 '''
 
 # IMPORT LIBRARIES
