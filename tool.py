@@ -131,8 +131,11 @@ with st.expander("Instructions"):
         * **PREPARE NOTES FOR OBSIDIAN** to process Obsidian note files as a .zip  
     """)
 
+
 # UPLOAD FILES
-##############
+############## 1
+############## 1
+
 st.write(' - - -')
 st.header(' UPLOAD FILES')
 st.markdown('Files should be __tab delimited__ with option __full record__ \
@@ -186,7 +189,8 @@ with st.expander("Show records imported"):
 wos_list, year_list, cat_list, cite_list, person_list, email_list, funding_list = \
     ([] for i in range(7))
 
-for index, row in wos_data_df.iterrows():
+#for index, row in wos_data_df.iterrows():
+for row in wos_data_df.itertuples(index=False):
     wosid = row[14]
     yr = row[11]
     cat1list = row[12] #specific categories
@@ -208,10 +212,14 @@ links_to_categories_df = links_to_categories_df[['wosid', 'year', 'cites', 'cate
 links_to_categories_df = links_to_categories_df.drop_duplicates(keep='last')
 
 
-# SHOW KEYWORDS FROM UPLOADED FILES
-###################################
+# MANAGE KEYWORDS
+################# 2
+################# 2
+
 st.write(' - - -')
 st.header("MANAGE KEYWORDS")
+
+# 1 - import and show keywords from uploaded files
 st.subheader('1 - keywords from uploaded files')
 
 search_criteria = """(links_to_categories_df.category != 'dummyCriteria')"""
@@ -225,7 +233,7 @@ extract_kewords_from_df = (pd.merge(selected_records, wos_data_df, on='wosid', h
 (wosid_list, year_list, orig_list, clean_list, comb_list, keyword_list) = \
     ([], [], [], [], [], [])
 
-for index, row in extract_kewords_from_df.iterrows():  # Iterate over all rows in dataframe
+for row in extract_kewords_from_df.itertuples(index=False):
     concat_clean = []
 
     if row[2] != '':
@@ -272,9 +280,8 @@ imported_keywords_chosen = st.multiselect(
     imported_keywords_default)
 
 
-# SHOW PRIVATE KEYWORDS
-#######################
-st.subheader('2 - add predefined keywords (optional')
+# 2 - import and show predefined keywords
+st.subheader('2 - add predefined keywords (optional)')
 st.markdown('Optionally expand the search with a list of __predefined keywords__')
 
 with st.expander('Upload file and manage keywords', expanded=False):
@@ -291,22 +298,37 @@ with st.expander('Upload file and manage keywords', expanded=False):
     final_list_of_keywords = list(set(imported_keywords_chosen + private_keywords_chosen))
     final_list_of_keywords.sort()
 
+# 3 - final list of keywords for checking and exporting
+st.subheader('3 - combined list of keywords')
+st.markdown('Check the final list of keywors and export list for later use')
 
-# EXTRACTING KEYWORDS FROM TITLE (and perhaps? abstract)
-##################################################
+with st.expander("Show combined list"):
+    st.dataframe(final_list_of_keywords)
+
+    keyword_contents = ''
+    for keyword_n in final_list_of_keywords:
+        keyword_contents += (keyword_n + '\n')
+
+    st.download_button('Download list of keywords for later use', keyword_contents, file_name='Keyword list')
+
+# PREPARE NOTES FOR OBSIDIAN
+############################ 3
+############################ 3
+
 st.write(' - - -')
 st.header('PREPARE NOTES FOR OBSIDIAN')
-
-with st.expander("Show list of selected keywords"):
-    st.dataframe(final_list_of_keywords)
 
 # set to supress warning of chained assigment - not recommended, but looks nicer in output ;)                
 pd.set_option("mode.chained_assignment", None)
 
 keyword_extracted_wos_data_df = wos_data_df.copy(deep=True)
 
-update_df = st.checkbox("Update data frame with keywords")
-if update_df:
+
+zip_name = st.text_input('Name of .zip file:', 'ObsidianNotes') +'.zip'
+st.caption('Name of the .zip archive that will contain your notes. Streamlit will save the file in your current workspace')
+run_script =  st.button('Export Obsidian notes to Zip archive file')
+
+if run_script:
     with st.spinner('Processing and extracting keywords ...'):
         clean_list = []
         keyword_extracted_wos_data_df['kw1_clean'] = ''
@@ -314,7 +336,8 @@ if update_df:
         keyword_extracted_wos_data_df['kw_title'] = ''
         keyword_extracted_wos_data_df['kw_abst'] = ''
 
-        for index, row in keyword_extracted_wos_data_df.iterrows():  # Iterate over all rows in dataframe
+        for index, row in keyword_extracted_wos_data_df.iterrows():
+        #for row in keyword_extracted_wos_data_df.itertuples(index=False):
 
             # cleaning regular keywords
             if run_keywords:
@@ -356,129 +379,125 @@ if update_df:
                     keyword_extracted_wos_data_df.loc[index,['kw_abst']] = ''
 
 
-    with st.expander("Show records imported"):
-        st.dataframe(keyword_extracted_wos_data_df)
-
-
     # OBSIDIAN EXPORT SCRIPT
-    run_script =  st.button('Export to Obsidian')
+    zf = zipfile.ZipFile(zip_name, "a", compression=zipfile.ZIP_DEFLATED)
+    keyword_list = final_list_of_keywords
 
-    if run_script:
-        zf = zipfile.ZipFile("sampleS2.zip", "a", compression=zipfile.ZIP_DEFLATED)
-        keyword_list = final_list_of_keywords
+    papers_in = keyword_extracted_wos_data_df[['wosid', 'authors', 'title', 'abstr', 'year', 'journal', 'cites', 'wos_sub_cat1', 'doi', 'usc1', 'usc2', 'kw1_clean', 'kw2_clean', 'kw_title', 'kw_abst']].fillna('')
+    papers_in['title'] = papers_in.title.astype(str)
+    papers_in['year'] = papers_in.year.astype(int)
+    papers_in['usc1'] = papers_in.usc1.astype(int)
+    papers_in['usc2'] = papers_in.usc2.astype(int)
 
-        papers_in = keyword_extracted_wos_data_df[['wosid', 'authors', 'title', 'abstr', 'year', 'journal', 'cites', 'wos_sub_cat1', 'doi', 'usc1', 'usc2', 'kw1_clean', 'kw2_clean', 'kw_title', 'kw_abst']].fillna('')
-        papers_in['title'] = papers_in.title.astype(str)
-        papers_in['year'] = papers_in.year.astype(int)
-        papers_in['usc1'] = papers_in.usc1.astype(int)
-        papers_in['usc2'] = papers_in.usc2.astype(int)
-
-        # CREATE OBSIDIAN NOTES FOR KEYWORDS
-        for keyword_item in keyword_list:
-            str_content_md = '' 
-            keyword_item = '% ' + keyword_item.replace("/", "-")
-            str_content_md += ('#### ' + keyword_item + empty_line + '- - -' + empty_line)
-            str_content_md += ('#keyword' + empty_line + '- - -' + empty_line)       
-            str_content_md += ('\n\n' + '##### Notes: ' + empty_line)
-            zf.writestr(str(keyword_item + '.md'), str_content_md)
-            
-        # CREATE OBSIDIAN NOTES FOR PAPERS WITH LINKS TO KEYWORDS AND SUBJECTS
-        category_list = []
-
-        for index, row in papers_in.iterrows():
-            str_content_md = ''
-
-            all_keywords_in_paper_list = []
-            all_keywords_in_paper = ()
-            wosid = row[0]
-            wosid = wosid[4:]  
-            authors = row[1]
-            title_author = authors.split(',')[0]
-
-            title_paper = row[2]
-            split_title = title_paper.split(' ')[0:4]
-            short_title = ' '.join(split_title)
-            
-            abstract = row[3]
-            year = str(int(row[4]))
-            
-            note_title_unclean = title_author + ' ' + year + ' -  ' + short_title
-            note_title = re.sub('[^a-zA-Z0-9 \n\.]', '', note_title_unclean)
-            note_title += '.md'
+    # CREATE OBSIDIAN NOTES FOR KEYWORDS
+    for keyword_item in keyword_list:
+        str_content_md = '' 
+        keyword_item = '% ' + keyword_item.replace("/", "-")
+        str_content_md += ('#### ' + keyword_item + empty_line + '- - -' + empty_line)
+        str_content_md += ('#keyword' + empty_line + '- - -' + empty_line)       
+        str_content_md += ('\n\n' + '##### Notes: ' + empty_line)
+        zf.writestr(str(keyword_item + '.md'), str_content_md)
         
-            journal = row[5]
-            journal = journal.title()
-            cites = int(row[6])
-            recent = int(row[9])
-            historic = int(row[10])
-            
-            wos_categories = row[7]
-            doi = row[8]
+    # CREATE OBSIDIAN NOTES FOR PAPERS WITH LINKS TO KEYWORDS AND SUBJECTS
+    category_list = []
 
-            author_keywords = row[11].split(";")
-            plus_keywords = row[12].split(";")
-            title_keywords = row[13].split(";")
-            abstract_keywords = row[14].split(";")
-            all_keywords_in_paper_set = set(list(itertools.chain(author_keywords,plus_keywords,title_keywords, abstract_keywords)))
+    for row in papers_in.itertuples(index=False):
+        str_content_md = ''
 
-            all_keywords_in_paper = list(all_keywords_in_paper_set)
+        all_keywords_in_paper_list = []
+        all_keywords_in_paper = ()
+        wosid = row[0]
+        wosid = wosid[4:]  
+        authors = row[1]
+        title_author = authors.split(',')[0]
 
-            all_keywords_in_paper = list(filter(None, all_keywords_in_paper))
-            all_keywords_in_paper = sorted(all_keywords_in_paper, key=str.lower)
+        title_paper = row[2]
+        split_title = title_paper.split(' ')[0:4]
+        short_title = ' '.join(split_title)
         
-            str_content_md += ('__' + title_paper + '__' + empty_line)
-            str_content_md += ('' + journal +  empty_line)
-            str_content_md += ('_' + authors +  '_' + empty_line)
-            str_content_md += ('' + 'Data: [year:: ' + year + ']  [cites:: ' + str(cites) + '] [recent:: ' + str(recent) + '] [historic:: ' + str(historic) + ']')
-            str_content_md += (empty_line + '- - -' + empty_line)
-            str_content_md += ('#paper   Web of Science id: ' + wosid + '     ')
-            str_content_md += ('[Google Scholar ](https://scholar.google.dk/scholar?q=' + doi + ')' + empty_line)
-            str_content_md += (empty_line + '- - -' + empty_line)
+        abstract = row[3]
+        year = str(int(row[4]))
+        
+        note_title_unclean = title_author + ' ' + year + ' -  ' + short_title
+        note_title = re.sub('[^a-zA-Z0-9 \n\.]', '', note_title_unclean)
+        note_title += '.md'
+    
+        journal = row[5]
+        journal = journal.title()
+        cites = int(row[6])
+        recent = int(row[9])
+        historic = int(row[10])
+        
+        wos_categories = row[7]
+        doi = row[8]
 
-            str_content_md += (abstract)
-            str_content_md += (empty_line)
-            str_content_md += ('- - -' + '\n')
+        author_keywords = row[11].split(";")
+        plus_keywords = row[12].split(";")
+        title_keywords = row[13].split(";")
+        abstract_keywords = row[14].split(";")
+        all_keywords_in_paper_set = set(list(itertools.chain(author_keywords,plus_keywords,title_keywords, abstract_keywords)))
 
-            str_content_md += ('_[rating:: 0] (scale: 0-10)_ \n')
-            str_content_md += ('- [ ] checked \n' + '- - -' + '\n')
-            
-            str_content_md += ('*WoS categories:*' + ': \n')
-            paper_categories = wos_categories.split(";")
-            for category in paper_categories:
-                categoryLstrp = category.lstrip()
-                str_content_md += ('[[%% ' + categoryLstrp + ']]' + '\n')
-                category_list.append(categoryLstrp)
-            
-            str_content_md += (empty_line + '*Keyword links:*' + '\n')
-            add_keywords = []
-            for kw in all_keywords_in_paper:
-                if kw in keyword_list:
-                    str_content_md += ('[[% ' + kw + ']]' + '\n') # + empty_line)
-                else:
-                    add_keywords.append(kw)
-            str_content_md += (empty_line +  'Additional keywords: ' + empty_line)
-            add_keywords_nicelist = ('\n'.join(add_keywords))
-            str_content_md += (str(add_keywords_nicelist))  
+        all_keywords_in_paper = list(all_keywords_in_paper_set)
 
-            zf.writestr(note_title, str_content_md)      
+        all_keywords_in_paper = list(filter(None, all_keywords_in_paper))
+        all_keywords_in_paper = sorted(all_keywords_in_paper, key=str.lower)
+    
+        str_content_md += ('__' + title_paper + '__' + empty_line)
+        str_content_md += ('' + journal +  empty_line)
+        str_content_md += ('_' + authors +  '_' + empty_line)
+        str_content_md += ('' + 'Data: [year:: ' + year + ']  [cites:: ' + str(cites) + '] [recent:: ' + str(recent) + '] [historic:: ' + str(historic) + ']')
+        str_content_md += (empty_line + '- - -' + empty_line)
+        str_content_md += ('#paper   Web of Science id: ' + wosid + '     ')
+        str_content_md += ('[Google Scholar ](https://scholar.google.dk/scholar?q=' + doi + ')' + empty_line)
+        str_content_md += ('- - -' + empty_line)
 
-        # CREATE NOTES FOR SUBJECT CATEGORIES
-        category_list = list(set(category_list))
-        category_list.sort()
+        str_content_md += (abstract)
+        str_content_md += (empty_line)
+        str_content_md += ('- - -' + empty_line)
 
-        for category_item in category_list:
-            str_content_md = ''
-            category_item = '%% ' + str(category_item)
+        str_content_md += ('_[rating:: 0] (scale: 0-10)_' + empty_line)
+        str_content_md += ('- [ ] checked' + empty_line + '- - -' + empty_line)
+        
+        str_content_md += ('*WoS categories:*' + ':' + empty_line)
+        paper_categories = wos_categories.split(";")
+        for category in paper_categories:
+            categoryLstrp = category.lstrip()
+            str_content_md += ('[[%% ' + categoryLstrp + ']]' + '\n')
+            category_list.append(categoryLstrp)
+        
+        str_content_md += (empty_line + '*Keyword links:*' + empty_line)
+        add_keywords = []
+        for kw in all_keywords_in_paper:
+            if kw in keyword_list:
+                str_content_md += ('[[% ' + kw + ']]' + '\n') # + empty_line)
+            else:
+                add_keywords.append(kw)
+        str_content_md += (empty_line +  'Additional keywords: ' + empty_line)
+        add_keywords_nicelist = ('\n'.join(add_keywords))
+        str_content_md += (str(add_keywords_nicelist))  
 
-            str_content_md += ('#### ' + category_item + empty_line + '- - -' + empty_line)
-            str_content_md += ('#subject' + empty_line + '- - -' + empty_line)       
-            str_content_md += ('\n\n' + '##### Characteristic keywords (most frequent first): ' + empty_line)
+        zf.writestr(note_title, str_content_md)      
 
-            zf.writestr(category_item + '.md', str_content_md)
+    # CREATE NOTES FOR SUBJECT CATEGORIES
+    category_list = list(set(category_list))
+    category_list.sort()
 
-        zf.close()
+    for category_item in category_list:
+        str_content_md = ''
+        category_item = '%% ' + str(category_item)
+
+        str_content_md += ('#### ' + category_item + empty_line + '- - -' + empty_line)
+        str_content_md += ('#subject' + empty_line + '- - -' + empty_line)       
+        str_content_md += ('\n\n' + '##### Characteristic keywords (most frequent first): ' + empty_line)
+
+        zf.writestr(category_item + '.md', str_content_md)
 
 
+    zf.close()
+    print('... obsidian mark-down files created in zip archive')
+
+    st.success('Notes exported succesfully. Check the exported data here:')
+    st.dataframe(keyword_extracted_wos_data_df)
 
 
             # selResKey = data_keywords[data_keywords[column_identifier] == category_item]
@@ -496,5 +515,3 @@ if update_df:
             #     str_content_md += (str(row[1]) + ' - [[' + str(row[0]) + ']] ' + ' \n')
 
             # md_file.close()
-
-    print('... obsidian mark-down files created')
