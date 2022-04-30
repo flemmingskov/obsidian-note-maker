@@ -16,6 +16,7 @@ import platform
 import itertools
 import zipfile
 import re
+import os
 from nltk.stem import WordNetLemmatizer
 wnl = WordNetLemmatizer()
 from nltk.corpus import stopwords
@@ -36,10 +37,10 @@ empty_line = ("\n\n")
 #################
 def get_platform():
     if (platform.system() == 'Darwin'):
-        mainwork = '/Users/flemmingskov/Desktop/'
+        desktop = os.path.join(os.path.join(os.path.expanduser('~')), 'Downloads/')
     else:
-        mainwork = 'C:/Users/au3406/iCloudDrive/Desktop/'
-    return mainwork
+        desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Downloads/')
+    return desktop
 
 def clean_keyword (old_keyword):
     composite_keyword = ''
@@ -323,7 +324,6 @@ pd.set_option("mode.chained_assignment", None)
 
 keyword_extracted_wos_data_df = wos_data_df.copy(deep=True)
 
-
 zip_name = st.text_input('Name of .zip file:', 'ObsidianNotes') +'.zip'
 st.caption('Name of the .zip archive that will contain your notes. Streamlit will save the file in your current workspace')
 run_script =  st.button('Export Obsidian notes to Zip archive file')
@@ -380,7 +380,8 @@ if run_script:
 
 
     # OBSIDIAN EXPORT SCRIPT
-    zf = zipfile.ZipFile(zip_name, "a", compression=zipfile.ZIP_DEFLATED)
+    my_desktop = get_platform()
+    zf = zipfile.ZipFile(my_desktop + zip_name, "a", compression=zipfile.ZIP_DEFLATED)
     keyword_list = final_list_of_keywords
 
     papers_in = keyword_extracted_wos_data_df[['wosid', 'authors', 'title', 'abstr', 'year', 'journal', 'cites', 'wos_sub_cat1', 'doi', 'usc1', 'usc2', 'kw1_clean', 'kw2_clean', 'kw_title', 'kw_abst']].fillna('')
@@ -451,6 +452,7 @@ if run_script:
         str_content_md += ('[Google Scholar ](https://scholar.google.dk/scholar?q=' + doi + ')' + empty_line)
         str_content_md += ('- - -' + empty_line)
 
+        str_content_md += '> [!abstract]' + '\n'
         str_content_md += (abstract)
         str_content_md += (empty_line)
         str_content_md += ('- - -' + empty_line)
