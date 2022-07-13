@@ -536,14 +536,17 @@ for row in raw_bios_df.itertuples(index=False):
         doi_list += ('OR DO = ' + doi  + "\n")
         doi_counter += 1
 
-st.download_button('Download list of dois for later use', doi_list, file_name='doiList')
+doi_list_sliced = doi_list[3:]
+doi_list_name = st.text_input('FileName:', 'doi_list') +'.txt'
+
+st.download_button('Download list of dois for later use',  doi_list_sliced, file_name = doi_list_name )
 
 
 print('... dois extracted to txt-file')
 
 st.success('DOIS created succesfully. Number of doi-lines: ' + str(doi_counter))
 
-st.write(doi_list)
+st.write(doi_list_sliced)
 #st.write(keyword_extracted_wos_data_df)
 
 
